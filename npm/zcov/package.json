@@ -1,0 +1,46 @@
+{
+  "name": "@zcov/cli",
+  "description": "V8 coverage to lcov, natively - a c8 replacement built on yuku",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DylanPiercey/zcov.git"
+  },
+  "homepage": "https://github.com/DylanPiercey/zcov",
+  "bugs": {
+    "url": "https://github.com/DylanPiercey/zcov/issues"
+  },
+  "bin": {
+    "zcov": "bin/zcov.js"
+  },
+  "files": [
+    "bin/zcov.js",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@zcov/linux-x64-gnu": "0.1.0",
+    "@zcov/linux-x64-musl": "0.1.0",
+    "@zcov/linux-arm64-gnu": "0.1.0",
+    "@zcov/linux-arm64-musl": "0.1.0",
+    "@zcov/darwin-x64": "0.1.0",
+    "@zcov/darwin-arm64": "0.1.0",
+    "@zcov/win32-x64": "0.1.0",
+    "@zcov/win32-arm64": "0.1.0",
+    "@zcov/freebsd-x64": "0.1.0"
+  },
+  "keywords": [
+    "coverage",
+    "c8",
+    "istanbul",
+    "lcov",
+    "v8",
+    "nyc",
+    "zig",
+    "yuku"
+  ]
+}

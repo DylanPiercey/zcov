@@ -1,0 +1,41 @@
+{
+  "name": "zcov",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.15.1",
+  "description": "V8 coverage to lcov, natively - a c8 replacement built on yuku",
+  "scripts": {
+    "build": "zig build -Doptimize=ReleaseFast",
+    "test": "node test/run.mjs && node test/regressions.mjs && node test/cli.mjs && node test/model.mjs && node test/scenarios.mjs && node test/fuzz.mjs && node test/fuzz.mjs --bundled",
+    "test:corpus": "node test/run.mjs",
+    "test:scenarios": "node test/scenarios.mjs",
+    "test:regressions": "node test/regressions.mjs",
+    "build:npm": "zig build release && node tools/gen-npm.mjs",
+    "fmt": "zig fmt src build.zig",
+    "fmt:check": "zig fmt --check src build.zig",
+    "test:cli": "node test/cli.mjs",
+    "test:model": "node test/model.mjs",
+    "test:fuzz": "node test/fuzz.mjs && node test/fuzz.mjs --bundled"
+  },
+  "devDependencies": {
+    "@bcoe/v8-coverage": "^1.0.2",
+    "ast-v8-to-istanbul": "^0.3.3",
+    "c8": "^12.0.0",
+    "esbuild": "^0.28.1",
+    "istanbul-lib-coverage": "^3.2.2",
+    "istanbul-lib-report": "^3.0.1",
+    "istanbul-reports": "^3.2.0",
+    "nyc": "^18.0.0",
+    "oxc-parser": "^0.141.0",
+    "yaml": "^2.9.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DylanPiercey/zcov.git"
+  },
+  "homepage": "https://github.com/DylanPiercey/zcov",
+  "bugs": {
+    "url": "https://github.com/DylanPiercey/zcov/issues"
+  }
+}

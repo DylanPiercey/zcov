@@ -1,0 +1,25 @@
+{
+  "name": "@zcov/darwin-x64",
+  "description": "zcov binary for darwin x64",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DylanPiercey/zcov.git"
+  },
+  "homepage": "https://github.com/DylanPiercey/zcov",
+  "bugs": {
+    "url": "https://github.com/DylanPiercey/zcov/issues"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "zcov",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

@@ -1,0 +1,28 @@
+---
+name: covers export statements
+guard: isExportAvailable
+code: |
+  export var a =2, b=3;
+  output = a + b;
+instrumentOpts:
+  esModules: true
+opts:
+  generateOnly: true
+tests:
+  - name: export
+    out: 5
+
+---
+name: covers import statements
+guard: isImportAvailable
+code: |
+  import util from "util";
+  output = util.format(args[0], args[1]);
+instrumentOpts:
+  esModules: true
+opts:
+  generateOnly: true
+tests:
+  - name: import
+    args: ["Hello %s", "world"]
+    out: "Hello world"

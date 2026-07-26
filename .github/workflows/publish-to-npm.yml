@@ -1,0 +1,86 @@
+name: Publish to NPM
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # changelogithub creates the GitHub Release
+      id-token: write # OIDC for npm provenance / trusted publishing
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+          use-cache: false
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Pinned exact: this Node bundles npm 11, and npm 12 breaks
+          # provenance publishing (https://github.com/npm/cli/issues/9722).
+          node-version: "24.18.0"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build native and test before publishing anything
+        run: |
+          zig build -Doptimize=ReleaseFast
+          pnpm test
+
+      - name: Cross-compile and generate npm packages
+        run: pnpm run build:npm
+
+      - name: Verify the tag matches package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag $tag does not match package.json version $pkg" >&2
+            exit 1
+          fi
+
+      - name: Generate changelog
+        run: npx changelogithub@14.0.0
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publishing runs on the npm CLI even though everything else here is pnpm:
+      # npm documents trusted publishing (OIDC) against npm >= 11.5.1, and pnpm
+      # v11 publishes natively rather than delegating to it. No token: the
+      # trusted publisher configured for each package mints a short-lived one
+      # from the `id-token` permission above, and attests provenance with it.
+      # Platform packages first: the main package depends on them, so a partial
+      # publish that lands zcov without its binaries is unusable. Each one is
+      # skipped if that exact version is already on the registry, so a rerun
+      # after a partial failure finishes the job instead of aborting on the
+      # first package that already went out.
+      - name: Publish platform packages
+        run: |
+          for dir in npm/zcov-*; do
+            ./.github/publish-one.sh "$dir"
+          done
+
+      - name: Publish zcov
+        run: ./.github/publish-one.sh npm/zcov

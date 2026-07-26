@@ -1,0 +1,28 @@
+zcov bundles and builds on the following third-party components.
+
+---
+
+yuku (https://github.com/yuku-toolchain/yuku) — MIT
+
+Statically linked into every published zcov binary; used for JavaScript and
+TypeScript parsing.
+
+  MIT License
+  Copyright (c) 2026 Yuku
+
+---
+
+test/corpus/*.yaml — MIT
+
+A reference corpus of coverage cases with published exact per-line counts,
+vendored unmodified and used only by the test suite.
+
+  MIT License
+  Copyright (c) 2024 Ari Perkkio
+
+  Originally derived from the istanbuljs project (BSD-3-Clause),
+  Copyright 2012-2015 Yahoo Inc.
+
+---
+
+The full text of the MIT License is reproduced in LICENSE.

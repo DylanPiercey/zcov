@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZIG_VERSION: 0.16.0
+
+jobs:
+  # Linux runs under harden-runner, which is where pnpm pulls the test
+  # dependencies and so where egress is worth auditing.
+  test:
+    name: Build & test (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+
+      - name: Cache Zig
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .zig-cache
+          key: zig-${{ runner.os }}-${{ hashFiles('build.zig', 'build.zig.zon', 'src/**/*.zig') }}
+          restore-keys: |
+            zig-${{ runner.os }}-
+
+      - name: Check formatting
+        run: zig fmt --check src build.zig
+
+      - name: Build
+        run: zig build -Doptimize=ReleaseFast
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Four suites at different angles: exact counts, pinned defects, every
+      # construct, and a diff. Run them all even if an earlier one fails.
+      - name: Reference corpus
+        run: pnpm run test:corpus
+
+      - name: Regressions
+        if: ${{ !cancelled() }}
+        run: pnpm run test:regressions
+
+      - name: CLI contract
+        if: ${{ !cancelled() }}
+        run: pnpm run test:cli
+
+      - name: Model vs instrumented execution
+        if: ${{ !cancelled() }}
+        run: pnpm run test:model
+
+      - name: Scenarios vs ast-v8-to-istanbul
+        if: ${{ !cancelled() }}
+        run: pnpm run test:scenarios
+
+      # Random programs against instrumented execution, run plain and bundled so
+      # the source-map path gets random input rather than only fixed corpora.
+      - name: Differential fuzz
+        if: ${{ !cancelled() }}
+        run: pnpm run test:fuzz
+
+  # The same suite on the other two platforms. harden-runner is not named here:
+  # it only supports Linux, and an action's `pre` step runs even when the step
+  # is skipped, so referencing it would fail on every macOS run.
+  test-portability:
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+
+      - name: Cache Zig
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .zig-cache
+          key: zig-${{ runner.os }}-${{ hashFiles('build.zig', 'build.zig.zon', 'src/**/*.zig') }}
+          restore-keys: |
+            zig-${{ runner.os }}-
+
+      - name: Check formatting
+        run: zig fmt --check src build.zig
+
+      - name: Build
+        run: zig build -Doptimize=ReleaseFast
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Four suites at different angles: exact counts, pinned defects, every
+      # construct, and a diff. Run them all even if an earlier one fails.
+      - name: Reference corpus
+        run: pnpm run test:corpus
+
+      - name: Regressions
+        if: ${{ !cancelled() }}
+        run: pnpm run test:regressions
+
+      - name: CLI contract
+        if: ${{ !cancelled() }}
+        run: pnpm run test:cli
+
+      - name: Model vs instrumented execution
+        if: ${{ !cancelled() }}
+        run: pnpm run test:model
+
+      - name: Scenarios vs ast-v8-to-istanbul
+        if: ${{ !cancelled() }}
+        run: pnpm run test:scenarios
+
+      # Random programs against instrumented execution, run plain and bundled so
+      # the source-map path gets random input rather than only fixed corpora.
+      - name: Differential fuzz
+        if: ${{ !cancelled() }}
+        run: pnpm run test:fuzz
+
+  cross:
+    name: Cross-compile all platforms
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+
+      # Every published target has to keep compiling; a release is a bad time
+      # to discover that one of them does not.
+      - name: Build every published platform
+        run: pnpm run build:npm

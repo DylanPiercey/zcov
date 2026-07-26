@@ -1,0 +1,14 @@
+node_modules/
+.zig-cache/
+zig-out/
+.DS_Store
+zig-pkg/
+
+# Cross-compiled release artifacts, produced by `zig build release`.
+npm/*/zcov
+npm/*/zcov.exe
+npm/*/zcov.pdb
+# Copied from the repo root by tools/gen-npm.mjs at publish time.
+npm/*/LICENSE
+npm/*/NOTICE
+npm/zcov/README.md

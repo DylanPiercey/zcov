@@ -1,0 +1,44 @@
+---
+name: function expr using strict
+guard: isObjectFreezeAvailable
+code: |
+  (function () {
+      "use strict";
+      var x = Object.freeze({ foo: 1 });
+      try {
+          { x.foo = 2; }
+          output = "fail";
+      } catch (ex) {
+          output = "pass";
+      }
+  }());
+tests:
+  - name: covers one statement less
+    args: []
+    out: pass
+    statements: {'0': 1, '1': 1, '2': 1, '3': 1, '4': 0, '5': 1}
+    lines: {'1': 1, '3': 1, '4': 1, '5': 1, '6': 0, '8': 1}
+    functions: {'0': 1}
+
+---
+name: function decl using strict
+guard: isObjectFreezeAvailable
+code: |
+  function foo() {
+      "use strict";
+      var x = Object.freeze({ foo: 1 });
+      try {
+          { x.foo = 2; }
+          output = "fail";
+      } catch (ex) {
+          output = "pass";
+      }
+  }
+  foo();
+tests:
+  - name: covers one statement less
+    args: []
+    out: pass
+    statements: {'0': 1, '1': 1, '2': 1, '3': 0, '4': 1, '5': 1 }
+    lines: { '3': 1, '4': 1, '5': 1, '6': 0, '8': 1, '11': 1}
+    functions: {'0': 1}

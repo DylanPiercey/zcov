@@ -1,0 +1,13 @@
+.{
+    .name = .zcov,
+    .version = "0.1.0",
+    .fingerprint = 0x345449fc33a0ebe2,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .yuku = .{
+            .url = "git+https://github.com/yuku-toolchain/yuku.git#214f50c8707ea7bea9bc2e35474c1cec2dfcc4ec",
+            .hash = "yuku-0.3.0-m6ranomcEwDq-7imHxJJkj-FVwP00fjFea8HFUaQmZGv",
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}

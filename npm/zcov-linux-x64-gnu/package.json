@@ -1,0 +1,28 @@
+{
+  "name": "@zcov/linux-x64-gnu",
+  "description": "zcov binary for linux x64 (glibc)",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DylanPiercey/zcov.git"
+  },
+  "homepage": "https://github.com/DylanPiercey/zcov",
+  "bugs": {
+    "url": "https://github.com/DylanPiercey/zcov/issues"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "zcov",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

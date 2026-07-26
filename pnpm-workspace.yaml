@@ -1,0 +1,4 @@
+# esbuild unpacks a native binary from its install script; nothing else here
+# needs to run one, so the rest stay blocked.
+allowBuilds:
+  esbuild: true
