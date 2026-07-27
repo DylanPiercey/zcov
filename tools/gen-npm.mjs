@@ -29,6 +29,9 @@ const shared = {
   bugs: { url: "https://github.com/DylanPiercey/zcov/issues" },
 };
 
+// Versioning regenerates the manifests long before any binary exists, so the
+// binary check is what separates that from preparing an actual publish.
+const manifestsOnly = process.argv.includes("--manifests-only");
 const optional = {};
 let missing = 0;
 for (const p of PLATFORMS) {
@@ -38,7 +41,7 @@ for (const p of PLATFORMS) {
   fs.mkdirSync(dir, { recursive: true });
 
   if (!fs.existsSync(path.join(dir, exe))) {
-    console.warn(`  missing binary: ${dir}/${exe} - run \`zig build release\``);
+    if (!manifestsOnly) console.warn(`  missing binary: ${dir}/${exe} - run \`zig build release\``);
     missing++;
   } else if (p.os !== "win32") {
     fs.chmodSync(path.join(dir, exe), 0o755);
@@ -89,7 +92,7 @@ fs.copyFileSync(path.join(ROOT, "LICENSE"), path.join(mainDir, "LICENSE"));
 fs.copyFileSync(path.join(ROOT, "NOTICE"), path.join(mainDir, "NOTICE"));
 
 console.log(`  wrote ${PLATFORMS.length} platform packages + @zcov/cli@${version}`);
-if (missing) {
+if (missing && !manifestsOnly) {
   console.error(`  ${missing} binaries missing; not publishable`);
   process.exitCode = 1;
 }

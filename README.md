@@ -388,9 +388,24 @@ pnpm run build:npm   # zig build release && node tools/gen-npm.mjs
 `@zcov/<platform>-<arch>[-libc]` and execs the binary. Linux musl is detected at
 runtime rather than assumed.
 
-Pushing a `v*` tag rebuilds, runs the full suite, verifies the tag matches
-`package.json`, then publishes the platform packages **before** the main package,
-so a partial publish can never leave `zcov` installable without its binaries.
+Versions come from changesets. Describe a change as you make it, and cut the
+release when you want one:
+
+```sh
+pnpm run change            # write a changeset alongside the change
+pnpm run release:version   # apply them: package.json, CHANGELOG.md, zon, manifests
+```
+
+`release:version` is the only thing that edits a version. It runs `changeset
+version`, then propagates to `build.zig.zon` and regenerates the npm manifests,
+because the publish workflow checks the tag against `package.json` alone — a zon
+left behind would ship a binary whose `--version` lies. CI runs the same check
+(`pnpm run release:check`) on every push.
+
+Commit that, then tag `v<version>` and push it. Pushing a `v*` tag rebuilds, runs
+the full suite, verifies the tag matches `package.json`, then publishes the
+platform packages **before** the main package, so a partial publish can never
+leave `zcov` installable without its binaries.
 CI builds and tests on Linux, macOS and Windows, checks formatting, and
 cross-compiles every target on each run.
 
