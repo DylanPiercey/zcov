@@ -1,6 +1,6 @@
 {
   "name": "zcov",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "packageManager": "pnpm@11.15.1",
   "description": "V8 coverage to lcov, natively - a c8 replacement built on yuku",
