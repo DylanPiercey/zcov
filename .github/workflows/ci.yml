@@ -58,6 +58,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The publish workflow checks the tag against package.json only, so a
+      # build.zig.zon left behind would ship a binary whose `--version` lies.
+      - name: Check the version is in sync
+        run: pnpm run release:check
+
       # Four suites at different angles: exact counts, pinned defects, every
       # construct, and a diff. Run them all even if an earlier one fails.
       - name: Reference corpus
@@ -126,6 +131,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The publish workflow checks the tag against package.json only, so a
+      # build.zig.zon left behind would ship a binary whose `--version` lies.
+      - name: Check the version is in sync
+        run: pnpm run release:check
 
       # Four suites at different angles: exact counts, pinned defects, every
       # construct, and a diff. Run them all even if an earlier one fails.
