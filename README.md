@@ -269,9 +269,10 @@ exercise drive letters and separator normalisation.
 | linux-x64-musl | yes | Alpine container |
 | linux-arm64-gnu | yes | Debian container, qemu |
 | linux-arm64-musl | yes | Alpine container, qemu |
-| win32-x64 | yes | Wine container, Windows-shaped paths |
+| win32-x64 | yes | CI runs the suite natively; also a Wine container, Windows-shaped paths |
+| darwin-arm64 | yes | CI runs the suite natively |
 | win32-arm64 | builds only | no emulator for it here |
-| darwin-x64, darwin-arm64 | builds only | not containerisable; CI only |
+| darwin-x64 | builds only | not containerisable, and CI's macOS runners are arm64 |
 | freebsd-x64 | builds only | no image tried |
 
 ```sh
@@ -463,19 +464,6 @@ The details that took measurement to get right:
 
 Known inaccuracies are enumerated in [ACCURACY.md](ACCURACY.md), all 13 of them,
 with the mechanism for each.
-
-## Remaining work
-
-Four targets compile but have not been exercised here: `win32-arm64`,
-`freebsd-x64` and the two darwin builds, which CI runs natively but
-`tools/test-platforms.sh` cannot reach.
-
-Configuration is `zcov.json` only. There is no `package.json` stanza, and no
-`--config` flag to point somewhere else.
-
-What memory is left is mostly every script's V8 ranges, held between the read and
-scan phases. Source maps are not a factor: they average 0.03MB each and are freed
-per bundle.
 
 ## Licence
 
