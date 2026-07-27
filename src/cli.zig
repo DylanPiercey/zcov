@@ -320,6 +320,14 @@ const BrContext = struct {
 const BrVal = struct { count: i32, span_end: u32 };
 const BrMap = std.HashMap(BrKey, BrVal, BrContext, std.hash_map.default_max_load_percentage);
 
+/// Unknown wins over a count. A default parameter is only ever proven skipped
+/// per process, so one that could not tell keeps the whole branch out of the
+/// report rather than letting the other's zero read as a miss.
+fn mergeBranch(a: i32, b: i32) i32 {
+    if (a == scan.unknown_branch or b == scan.unknown_branch) return scan.unknown_branch;
+    return a +| b;
+}
+
 // One range set per contributing process: sets from different processes do not
 // nest, so they are scored apart and only the per-line results combined.
 const Script = struct { direct: bool, sets: std.ArrayList(std.ArrayList(scan.Range)) };
@@ -546,7 +554,7 @@ fn recordItem(w: *Worker, file: []const u8, item: scan.ItemHit, code: []const u8
             gop.key_ptr.file = try w.gpa.dupe(u8, file);
             gop.value_ptr.* = .{ .count = item.count, .span_end = item.span_end };
         } else {
-            gop.value_ptr.count +|= item.count;
+            gop.value_ptr.count = mergeBranch(gop.value_ptr.count, item.count);
             if (item.span_end > gop.value_ptr.span_end) gop.value_ptr.span_end = item.span_end;
         }
         return;
@@ -1668,7 +1676,7 @@ fn report(init: std.process.Init, gpa: std.mem.Allocator, a: std.mem.Allocator, 
             if (!gop.found_existing) {
                 gop.value_ptr.* = e.value_ptr.*;
             } else {
-                gop.value_ptr.count +|= e.value_ptr.count;
+                gop.value_ptr.count = mergeBranch(gop.value_ptr.count, e.value_ptr.count);
                 if (e.value_ptr.span_end > gop.value_ptr.span_end) gop.value_ptr.span_end = e.value_ptr.span_end;
             }
         }
@@ -1764,6 +1772,8 @@ fn report(init: std.process.Init, gpa: std.mem.Allocator, a: std.mem.Allocator, 
     }
     var bi2 = all_brs.iterator();
     while (bi2.next()) |e| {
+        // Nothing proved it either way, so it is omitted rather than guessed at.
+        if (e.value_ptr.count == scan.unknown_branch) continue;
         const idx = by_path.get(e.key_ptr.file) orelse continue;
         try reports.items[idx].brs.append(a, .{
             .line = e.key_ptr.line,

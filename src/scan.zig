@@ -1254,8 +1254,9 @@ pub fn scoreSet(
 
     // --- functions and branches -------------------------------------------
     const item_counts = try scoreItems(a, prep.items, off, ranges);
+    // `unknown_branch` travels to the merge rather than being dropped here: one
+    // appearance proving a default skipped must not outvote one that could not tell.
     for (prep.items, item_counts) |item, count| {
-        if (count == unknown_branch) continue;
         if (!mapped) {
             try items_out.append(gpa, .{
                 .source = -1,

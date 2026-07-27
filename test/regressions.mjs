@@ -429,6 +429,22 @@ const CASES = [
     expect: { brs: {}, noBranchesOn: [1] },
   },
   {
+    name: "a process that never ran a function leaves its default alone",
+    why: "skipped is only ever proven per process, so the appearance that proved it outvoted the one that took the default and invented a miss",
+    files: {
+      "main.js": `function f(a, b = 2) {\n  return a + b;\n}\nif (process.env.CALL) f(1);\n`,
+    },
+    env: [{ CALL: "1" }, {}],
+    expect: { brs: {}, noBranchesOn: [1] },
+  },
+  {
+    name: "a default no process ever reached is still a miss",
+    // The other side of omitting on unknown: a zero range over the expression
+    // still proves the default was skipped, and that is not a guess.
+    files: { "main.js": `function f(a, b = 2) {\n  return a + b;\n}\n` },
+    expect: { brs: { 1: [0] } },
+  },
+  {
     name: "v8-to-istanbul: switch cases are branches",
     files: {
       "main.js": `function pick(n) {\n  switch (n) {\n    case 1:\n      return "one";\n    case 2:\n      return "two";\n    default:\n      return "other";\n  }\n}\npick(1);\n`,
