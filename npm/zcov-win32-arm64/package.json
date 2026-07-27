@@ -1,7 +1,7 @@
 {
   "name": "@zcov/win32-arm64",
   "description": "zcov binary for win32 arm64",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "license": "MIT",
   "repository": {
     "type": "git",
