@@ -183,6 +183,29 @@ const CASES = [
     expect: { lines: { 2: 3, 3: 3 }, fns: { 1: 3 }, assert: "src.js" },
   },
   {
+    name: "a branch read directly and through a bundle is one branch",
+    why: "a remap only approximates the column when the generated text is a different length, so the bundle's copy keyed apart from the direct read and the same branch was reported twice",
+    files: {
+      "src.js": `function pick(a, b) {\n  return a || b;\n}\nmodule.exports = pick;\n`,
+      // Deliberately shorter than the source, so interpolating the column from
+      // the line-start mapping overshoots the real one.
+      "bundle.js": `function pick(a,b){return a||b;}\npick(1,0);\n//# sourceMappingURL=bundle.js.map\n`,
+      "bundle.js.map": JSON.stringify({
+        version: 3,
+        file: "bundle.js",
+        sources: ["src.js"],
+        // Generated line 1 -> source line 2, column 0.
+        mappings: "AACA;AAAA",
+      }),
+      "main.js": `require("./bundle.js");\nconst pick = require("./src.js");\npick(0, 5);\n`,
+    },
+    entry: "main.js",
+    assert: "src.js",
+    // One `a || b`, so one record with two paths rather than two records.
+    // `a` is evaluated by both calls, `b` only when `a` is falsey.
+    expect: { brs: { 2: [2, 1] }, assert: "src.js" },
+  },
+  {
     name: "two functions on one mapped line stay two functions",
     why: "taking the segment's source column verbatim put every mid-span function at whatever opened the span, collapsing distinct functions onto one position",
     files: {

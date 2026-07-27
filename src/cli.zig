@@ -282,7 +282,7 @@ const LineMap = std.HashMap(Key, i32, KeyContext, std.hash_map.default_max_load_
 /// A function is identified by where its name sits in the original source, so
 /// the same function inlined into a thousand bundles merges into one entry.
 const FnKey = struct { file: []const u8, line: i32, col: i32 };
-const FnVal = struct { count: i32, name: []const u8 };
+const FnVal = struct { count: i32, name: []const u8, direct: bool = false };
 const FnContext = struct {
     pub fn hash(_: FnContext, k: FnKey) u64 {
         var h = std.hash.Wyhash.init(0);
@@ -317,8 +317,123 @@ const BrContext = struct {
 };
 /// The count, plus the extent of the node the group belongs to -- see
 /// `scan.Item.span_end`. Not part of the key: it must not split a group.
-const BrVal = struct { count: i32, span_end: u32 };
+/// The same rule as `coalesceBranchColumns`, for functions. Their key carries
+/// no type or slot, so a line holding more than one function cannot be told
+/// apart and is left as it is.
+fn coalesceFunctionColumns(a: std.mem.Allocator, fns: *FnMap) !void {
+    const GroupKey = struct { file: []const u8, line: i32 };
+    const GroupContext = struct {
+        pub fn hash(_: @This(), k: GroupKey) u64 {
+            var h = std.hash.Wyhash.init(0);
+            h.update(k.file);
+            h.update(std.mem.asBytes(&k.line));
+            return h.final();
+        }
+        pub fn eql(_: @This(), x: GroupKey, y: GroupKey) bool {
+            return x.line == y.line and std.mem.eql(u8, x.file, y.file);
+        }
+    };
+    const Anchor = struct { col: i32, seen: u32 };
+    var anchors = std.HashMap(GroupKey, Anchor, GroupContext, std.hash_map.default_max_load_percentage).init(a);
+    defer anchors.deinit();
+
+    var it = fns.iterator();
+    while (it.next()) |e| {
+        if (!e.value_ptr.direct) continue;
+        const gop = try anchors.getOrPut(.{ .file = e.key_ptr.file, .line = e.key_ptr.line });
+        if (gop.found_existing) gop.value_ptr.seen += 1 else gop.value_ptr.* = .{ .col = e.key_ptr.col, .seen = 1 };
+    }
+    if (anchors.count() == 0) return;
+
+    var out: FnMap = .init(a);
+    var it2 = fns.iterator();
+    while (it2.next()) |e| {
+        var key = e.key_ptr.*;
+        if (!e.value_ptr.direct) {
+            if (anchors.get(.{ .file = key.file, .line = key.line })) |anchor| {
+                if (anchor.seen == 1) key.col = anchor.col;
+            }
+        }
+        const gop = try out.getOrPut(key);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = e.value_ptr.*;
+        } else {
+            gop.value_ptr.count +|= e.value_ptr.count;
+            gop.value_ptr.direct = gop.value_ptr.direct or e.value_ptr.direct;
+            if (betterName(e.value_ptr.name, gop.value_ptr.name)) gop.value_ptr.name = e.value_ptr.name;
+        }
+    }
+    fns.* = out;
+}
+
+const BrVal = struct { count: i32, span_end: u32, direct: bool = false };
 const BrMap = std.HashMap(BrKey, BrVal, BrContext, std.hash_map.default_max_load_percentage);
+
+/// A branch is only ever at one column, but a script read straight off disk
+/// reports the real one while a bundle can only be remapped to it -- and a
+/// remap is an approximation as soon as the generated text is not the same
+/// length as the source. Fold the approximations onto the column a direct read
+/// pins, so one branch stops being reported as two, one of them never taken.
+/// Only a lone direct column can settle a group: two of them, and which is
+/// which is a guess, so those are left alone.
+fn coalesceBranchColumns(a: std.mem.Allocator, brs: *BrMap) !void {
+    const GroupKey = struct { file: []const u8, line: i32, btype: u8, slot: u16 };
+    const GroupContext = struct {
+        pub fn hash(_: @This(), k: GroupKey) u64 {
+            var h = std.hash.Wyhash.init(0);
+            h.update(k.file);
+            h.update(std.mem.asBytes(&k.line));
+            h.update(std.mem.asBytes(&k.btype));
+            h.update(std.mem.asBytes(&k.slot));
+            return h.final();
+        }
+        pub fn eql(_: @This(), x: GroupKey, y: GroupKey) bool {
+            return x.line == y.line and x.btype == y.btype and
+                x.slot == y.slot and std.mem.eql(u8, x.file, y.file);
+        }
+    };
+    const Anchor = struct { col: i32, seen: u32 };
+    var anchors = std.HashMap(GroupKey, Anchor, GroupContext, std.hash_map.default_max_load_percentage).init(a);
+    defer anchors.deinit();
+
+    var it = brs.iterator();
+    while (it.next()) |e| {
+        if (!e.value_ptr.direct) continue;
+        const gop = try anchors.getOrPut(.{
+            .file = e.key_ptr.file,
+            .line = e.key_ptr.line,
+            .btype = e.key_ptr.btype,
+            .slot = e.key_ptr.slot,
+        });
+        if (gop.found_existing) gop.value_ptr.seen += 1 else gop.value_ptr.* = .{ .col = e.key_ptr.col, .seen = 1 };
+    }
+    if (anchors.count() == 0) return;
+
+    var out: BrMap = .init(a);
+    var it2 = brs.iterator();
+    while (it2.next()) |e| {
+        var key = e.key_ptr.*;
+        if (!e.value_ptr.direct) {
+            if (anchors.get(.{
+                .file = key.file,
+                .line = key.line,
+                .btype = key.btype,
+                .slot = key.slot,
+            })) |anchor| {
+                if (anchor.seen == 1) key.col = anchor.col;
+            }
+        }
+        const gop = try out.getOrPut(key);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = e.value_ptr.*;
+        } else {
+            gop.value_ptr.count = mergeBranch(gop.value_ptr.count, e.value_ptr.count);
+            if (e.value_ptr.span_end > gop.value_ptr.span_end) gop.value_ptr.span_end = e.value_ptr.span_end;
+            gop.value_ptr.direct = gop.value_ptr.direct or e.value_ptr.direct;
+        }
+    }
+    brs.* = out;
+}
 
 /// Unknown wins over a count. A default parameter is only ever proven skipped
 /// per process, so one that could not tell keeps the whole branch out of the
@@ -550,12 +665,16 @@ fn recordItem(w: *Worker, file: []const u8, item: scan.ItemHit, code: []const u8
             .btype = @intFromEnum(item.btype),
             .slot = item.slot,
         });
+        // `source == -1` is a script read straight off disk rather than remapped
+        // through a bundle, so its column is the source's own.
+        const direct = item.source == -1;
         if (!gop.found_existing) {
             gop.key_ptr.file = try w.gpa.dupe(u8, file);
-            gop.value_ptr.* = .{ .count = item.count, .span_end = item.span_end };
+            gop.value_ptr.* = .{ .count = item.count, .span_end = item.span_end, .direct = direct };
         } else {
             gop.value_ptr.count = mergeBranch(gop.value_ptr.count, item.count);
             if (item.span_end > gop.value_ptr.span_end) gop.value_ptr.span_end = item.span_end;
+            gop.value_ptr.direct = gop.value_ptr.direct or direct;
         }
         return;
     }
@@ -566,10 +685,11 @@ fn recordItem(w: *Worker, file: []const u8, item: scan.ItemHit, code: []const u8
     const gop = try w.fns.getOrPut(.{ .file = file, .line = item.line, .col = item.col });
     if (!gop.found_existing) {
         gop.key_ptr.file = try w.gpa.dupe(u8, file);
-        gop.value_ptr.* = .{ .count = item.count, .name = try w.gpa.dupe(u8, name) };
+        gop.value_ptr.* = .{ .count = item.count, .name = try w.gpa.dupe(u8, name), .direct = item.source == -1 };
         return;
     }
     gop.value_ptr.count +|= item.count;
+    gop.value_ptr.direct = gop.value_ptr.direct or item.source == -1;
     if (betterName(name, gop.value_ptr.name)) gop.value_ptr.name = try w.gpa.dupe(u8, name);
 }
 
@@ -1667,6 +1787,7 @@ fn report(init: std.process.Init, gpa: std.mem.Allocator, a: std.mem.Allocator, 
                 gop.value_ptr.* = e.value_ptr.*;
             } else {
                 gop.value_ptr.count +|= e.value_ptr.count;
+                gop.value_ptr.direct = gop.value_ptr.direct or e.value_ptr.direct;
                 if (betterName(e.value_ptr.name, gop.value_ptr.name)) gop.value_ptr.name = e.value_ptr.name;
             }
         }
@@ -1678,9 +1799,12 @@ fn report(init: std.process.Init, gpa: std.mem.Allocator, a: std.mem.Allocator, 
             } else {
                 gop.value_ptr.count = mergeBranch(gop.value_ptr.count, e.value_ptr.count);
                 if (e.value_ptr.span_end > gop.value_ptr.span_end) gop.value_ptr.span_end = e.value_ptr.span_end;
+                gop.value_ptr.direct = gop.value_ptr.direct or e.value_ptr.direct;
             }
         }
     }
+    try coalesceBranchColumns(a, &all_brs);
+    try coalesceFunctionColumns(a, &all_fns);
 
     // Which files to report on: every source under the root, or only the ones
     // the run loaded when --no-all is passed. The walk is what surfaces a 0%.
