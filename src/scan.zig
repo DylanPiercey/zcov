@@ -1276,10 +1276,15 @@ pub fn scoreSet(
         const gc: u32 = off.columnU16(item.loc);
         const seg = findSegment(prep.segments, gl, gc) orelse continue;
         if (!validSegment(seg, prep.sources.len)) continue;
+        // A segment covers a span, so the source column has to advance with the
+        // generated one. Taking `src_col` verbatim lands every item that starts
+        // mid-span on whatever the segment opened with -- a callee, a string --
+        // and a bundle that does map the item exactly then disagrees about where
+        // it is, so the two never merge and one reads as never run.
         try items_out.append(gpa, .{
             .source = seg.source,
             .line = seg.src_line + 1,
-            .col = seg.src_col,
+            .col = seg.src_col + @as(i32, @intCast(gc - seg.gen_col)),
             .count = count,
             .is_branch = item.is_branch,
             .btype = item.btype,
