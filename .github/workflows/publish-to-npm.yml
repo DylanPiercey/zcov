@@ -60,11 +60,10 @@ jobs:
             exit 1
           fi
 
-      - name: Generate changelog
-        run: npx changelogithub@14.0.0
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ci.yml checks this too, but its triggers do not include tags, so it never
+      # runs for the release itself and the guard has to exist here as well.
+      - name: Verify the version is in sync
+        run: pnpm run release:check
 
       # Publishing runs on the npm CLI even though everything else here is pnpm:
       # npm documents trusted publishing (OIDC) against npm >= 11.5.1, and pnpm
@@ -84,3 +83,14 @@ jobs:
 
       - name: Publish zcov
         run: ./.github/publish-one.sh npm/zcov
+
+      # After the publish, so the release only ever describes packages that
+      # actually went out. The body is changesets' own CHANGELOG section.
+      - name: Create the GitHub release
+        run: |
+          node tools/release-notes.mjs "${GITHUB_REF_NAME#v}" > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

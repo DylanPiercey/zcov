@@ -405,7 +405,9 @@ left behind would ship a binary whose `--version` lies. CI runs the same check
 Commit that, then tag `v<version>` and push it. Pushing a `v*` tag rebuilds, runs
 the full suite, verifies the tag matches `package.json`, then publishes the
 platform packages **before** the main package, so a partial publish can never
-leave `zcov` installable without its binaries.
+leave `zcov` installable without its binaries. The GitHub release is cut last,
+from that version's `CHANGELOG.md` section, so it only ever describes packages
+that actually went out.
 CI builds and tests on Linux, macOS and Windows, checks formatting, and
 cross-compiles every target on each run.
 
