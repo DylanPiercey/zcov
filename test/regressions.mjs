@@ -183,6 +183,28 @@ const CASES = [
     expect: { lines: { 2: 3, 3: 3 }, fns: { 1: 3 }, assert: "src.js" },
   },
   {
+    name: "two functions on one mapped line stay two functions",
+    why: "taking the segment's source column verbatim put every mid-span function at whatever opened the span, collapsing distinct functions onto one position",
+    files: {
+      // `first` opens the line, the arrow sits at column 32. A line-start
+      // mapping only tells them apart if the source column advances with the
+      // generated one.
+      "src.js": `function first() {} const run = (a) => a + 1;\nmodule.exports = { first, run };\n`,
+      "bundle.js": `function first() {} const run = (a) => a + 1;\nfirst();\nrun(1);\n//# sourceMappingURL=bundle.js.map\n`,
+      "bundle.js.map": JSON.stringify({
+        version: 3,
+        file: "bundle.js",
+        sources: ["src.js"],
+        // Column 0 of each line only, so neither function is mapped exactly.
+        mappings: "AAAA;AACA;AACA",
+      }),
+      "main.js": `require("./bundle.js");\n`,
+    },
+    entry: "main.js",
+    assert: "src.js",
+    expect: { fnCount: 2, assert: "src.js" },
+  },
+  {
     name: "the same script id twice in one dump is not double counted",
     why: "a repeated entry is one script; a repeated URL with a different id is not",
     files: { "main.js": `function hit() {\n  return 1;\n}\nhit();\n` },
@@ -656,6 +678,11 @@ for (const [i, c] of CASES.entries()) {
     for (const [line, want] of Object.entries(c.expect.fns ?? {})) {
       const got = rec.fns.get(+line);
       if (got !== want) errs.push(`fn on line ${line}: want ${want}, got ${got ?? "missing"}`);
+    }
+    // lcov carries no column, so two functions sharing a line are only told
+    // apart by how many records there are.
+    if (c.expect.fnCount !== undefined && rec.fnLines.length !== c.expect.fnCount) {
+      errs.push(`function records: want ${c.expect.fnCount}, got ${rec.fnLines.length}`);
     }
     for (const line of c.expect.noBranchesOn ?? []) {
       if (rec.brs.has(line)) errs.push(`line ${line} should have no branches, got ${JSON.stringify(rec.brs.get(line))}`);
